@@ -1,23 +1,18 @@
 import os
-import torch
-import numpy as np
-from torch.utils import data
-from torch.utils.data import Dataset
-import h5py
-from torchvision.transforms import functional
-import torchvision.transforms.functional as TF
-import random
-import matplotlib.pyplot as plt
-import torchvision.transforms as transforms
-from PIL import Image
+
 import albumentations as A
-from .utils import polar_inv_transform, polar_transform
+import h5py
+import torch
+import torchvision.transforms as transforms
+from torch.utils.data import Dataset
+
+from .utils import polar_transform
 
 
 class ODOC(Dataset):
     """ODOC Dataset"""
 
-    def __init__(self, base_dir=None, split="train", transform=None, polar_trans = False):
+    def __init__(self, base_dir=None, split="train", transform=None, polar_trans=False):
         self._base_dir = base_dir
         self.sample_list = []
         self.transform = transform
@@ -42,7 +37,9 @@ class ODOC(Dataset):
 
         self.image_list = [item.replace("\n", "") for item in self.image_list]
 
-        self.transform = transforms.Compose([transforms.ToTensor(), transforms.Resize((256, 256))])
+        self.transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Resize((256, 256))]
+        )
 
         self.test_transform = transforms.Compose(
             [
@@ -52,18 +49,22 @@ class ODOC(Dataset):
             ]
         )
 
-        self.augmentation = A.Compose([
-            A.HorizontalFlip(p=0.3),
-            A.VerticalFlip(p=0.3),
-            A.OneOf([
-                A.ChannelShuffle(p=0.3),
-                A.FancyPCA(),
-                A.ColorJitter(),
-            ]),
-            # A.ShiftScaleRotate(),
-            A.ToGray(p=0.3),
-            A.CLAHE(),
-        ])
+        self.augmentation = A.Compose(
+            [
+                A.HorizontalFlip(p=0.3),
+                A.VerticalFlip(p=0.3),
+                A.OneOf(
+                    [
+                        A.ChannelShuffle(p=0.3),
+                        A.FancyPCA(),
+                        A.ColorJitter(),
+                    ]
+                ),
+                # A.ShiftScaleRotate(),
+                A.ToGray(p=0.3),
+                A.CLAHE(),
+            ]
+        )
 
     def __len__(self):
         return len(self.image_list)
@@ -81,7 +82,6 @@ class ODOC(Dataset):
         # _image = polar_inv_transform(image)
         # plt.imshow(_image)
         # plt.show()
-
 
         if self.is_train:
             # (
@@ -106,11 +106,11 @@ class ODOC(Dataset):
             else:
                 masks = [label_cup, label_disc, con_gau_cup, con_gau_disc]
                 transformed = self.augmentation(image=image, masks=masks)
-                image = transformed['image']
-                label_cup, label_disc, con_gau_cup, con_gau_disc = transformed['masks']
+                image = transformed["image"]
+                label_cup, label_disc, con_gau_cup, con_gau_disc = transformed["masks"]
 
             # print("label_cup.shape:", label_cup.shape)
-            # print("label_disc.shape:", label_disc.shape)            
+            # print("label_disc.shape:", label_disc.shape)
             # print("image.type:", type(image))
             # # print("label_cup.shape:", label_cup.size())
             # plt.subplot(311)
@@ -120,7 +120,7 @@ class ODOC(Dataset):
             # plt.subplot(313)
             # plt.imshow(label_disc)
             # plt.show()
-            
+
             image = self.test_transform(image)
 
             label_cup = self.transform(label_cup)

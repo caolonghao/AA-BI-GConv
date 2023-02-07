@@ -1,18 +1,12 @@
-import torch.nn.functional as F
-import numpy as np
-import torch
-import os
 import argparse
+import os
+
+import torch
+from torch.utils.data import DataLoader
+
 from lib.ODOC_BMVC import ODOC_seg_edge
 from utils.Dataloader_ODOC import ODOC
-from torch.utils.data import DataLoader
-from sklearn.metrics import roc_auc_score, jaccard_score, balanced_accuracy_score
-import cv2
-from PIL import Image, ImageFilter
-from medpy import metric
-import matplotlib.pyplot as plt
 from utils.utils import model_test
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -40,12 +34,7 @@ parser.add_argument(
     default=0,
     help="balance factor to control consistency loss and body loss",
 )
-parser.add_argument(
-    "--postgnn",
-    type=str,
-    default="APPNP",
-    help="PostGNN Type"
-)
+parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
 
 args = parser.parse_args()
 
@@ -53,7 +42,9 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}_{}_bs_beta_{}_base_lr_{}".format(args.postgnn, args.batch_size, args.beta, args.base_lr)
+    + "_{}_{}_bs_beta_{}_base_lr_{}".format(
+        args.postgnn, args.batch_size, args.beta, args.base_lr
+    )
 )
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 

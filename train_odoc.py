@@ -1,25 +1,22 @@
-import sys
-from tqdm import tqdm
-from tensorboardX import SummaryWriter
-import shutil
-import logging
-import random
-import numpy as np
-import torch.backends.cudnn as cudnn
-import torch
-import os
 import argparse
-from lib.ODOC_BMVC import ODOC_seg_edge
-from utils.utils import clip_gradient
-from utils.Dataloader_ODOC import ODOC
-from utils.criterion import BinaryDiceLoss
-from utils.utils import model_test
-from torch.utils.data import DataLoader
-from sklearn.metrics import roc_auc_score, jaccard_score, balanced_accuracy_score
-from torch.nn import functional as F
-import matplotlib.pyplot as plt
+import logging
 import os
-from medpy import metric
+import random
+import shutil
+import sys
+
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
+from tensorboardX import SummaryWriter
+from torch.nn import functional as F
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from lib.ODOC_BMVC import ODOC_seg_edge
+from utils.criterion import BinaryDiceLoss
+from utils.Dataloader_ODOC import ODOC
+from utils.utils import clip_gradient, model_test
 
 # os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
 
@@ -33,9 +30,7 @@ parser.add_argument(
     "--max_iterations", type=int, default=50000, help="maximum epoch number to train"
 )
 parser.add_argument("--batch_size", type=int, default=48, help="batch_size per gpu")
-parser.add_argument(
-    "--base_lr", type=float, default=0.006, help="learning rate"
-)
+parser.add_argument("--base_lr", type=float, default=0.006, help="learning rate")
 parser.add_argument(
     "--deterministic", type=int, default=1, help="whether use deterministic training"
 )
@@ -58,17 +53,9 @@ parser.add_argument(
     help="every n itetations decay learning rate",
 )
 parser.add_argument(
-    "--polar_transform",
-    type=bool,
-    default=False,
-    help="polar transform pre-process"
+    "--polar_transform", type=bool, default=False, help="polar transform pre-process"
 )
-parser.add_argument(
-    "--postgnn",
-    type=str,
-    default="APPNP",
-    help="PostGNN Type"
-)
+parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
 
 args = parser.parse_args()
 
@@ -77,7 +64,9 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}_{}_bs_beta_{}_base_lr_{}".format(args.postgnn, args.batch_size, args.beta, args.base_lr)
+    + "_{}_{}_bs_beta_{}_base_lr_{}".format(
+        args.postgnn, args.batch_size, args.beta, args.base_lr
+    )
 )
 
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -111,10 +100,10 @@ if __name__ == "__main__":
         shutil.rmtree(snapshot_path + "/code")
 
     model_performance_log_path = os.path.join(snapshot_path, "performance_log.txt")
-    
+
     if os.path.exists(model_performance_log_path):
         os.remove(model_performance_log_path)
-        
+
     # shutil.copytree(
     #     ".", snapshot_path + "/code", shutil.ignore_patterns([".git", "__pycache__"])
     # )
@@ -138,7 +127,6 @@ if __name__ == "__main__":
     db_train = ODOC(base_dir=train_data_path, split="train")
     db_valid = ODOC(base_dir=train_data_path, split="valid")
 
-
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
 
@@ -152,7 +140,6 @@ if __name__ == "__main__":
     )
     validloader = DataLoader(db_valid, batch_size=1, shuffle=False)
 
-    
     optimizer = torch.optim.Adam(model.parameters(), lr=base_lr)
 
     dice_loss = BinaryDiceLoss()
@@ -196,7 +183,6 @@ if __name__ == "__main__":
             )
             outputs = F.interpolate(input=outputs, size=(256, 256), mode="bilinear")
 
-
             cup_loss = dice_loss(outputs[:, 0, ...], label_batch[:, 0, ...].float())
             disc_loss = dice_loss(outputs[:, 1, ...], label_batch[:, 1, ...].float())
             region_loss = cup_loss + disc_loss
@@ -237,10 +223,13 @@ if __name__ == "__main__":
                 logging.info("save model to {}".format(save_mode_path))
 
                 print("Validation: ...")
-                cup_dice_mean, cup_dice_up95, cup_dice_low95 = model_test(model, validloader)
-                with open(model_performance_log_path, 'a') as f:
-                    p_log = "iter: {}   cup_dice_mean: {:.4f}   cup_dice_up95: {:.4f}   cup_dice_low95:{:.4f}\n".format(iter_num, cup_dice_mean,
-                                                                                                        cup_dice_up95, cup_dice_low95)
+                cup_dice_mean, cup_dice_up95, cup_dice_low95 = model_test(
+                    model, validloader
+                )
+                with open(model_performance_log_path, "a") as f:
+                    p_log = "iter: {}   cup_dice_mean: {:.4f}   cup_dice_up95: {:.4f}   cup_dice_low95:{:.4f}\n".format(
+                        iter_num, cup_dice_mean, cup_dice_up95, cup_dice_low95
+                    )
                     f.write(p_log)
 
                 if cup_dice_mean > best_cup_dice_mean:
@@ -259,9 +248,11 @@ if __name__ == "__main__":
         if iter_num >= max_iterations:
             iterator.close()
             break
-    
-    with open(model_performance_log_path, 'a') as f:
-        p_log = "best_iter: {:.4f}  best_cup_dice_mean: {:.4f}\n".format(best_model_iter, best_cup_dice_mean)
+
+    with open(model_performance_log_path, "a") as f:
+        p_log = "best_iter: {:.4f}  best_cup_dice_mean: {:.4f}\n".format(
+            best_model_iter, best_cup_dice_mean
+        )
         f.write(p_log)
 
     writer.close()

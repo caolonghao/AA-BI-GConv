@@ -1,9 +1,8 @@
-import torch.nn as nn
-import torch
-import torch.nn.functional as F
-from torch import Tensor
 import dgl
+import torch
+import torch.nn as nn
 from dgl.nn.pytorch.conv import GATConv
+
 
 class GCN(nn.Module):
     def __init__(self, num_state):
@@ -21,8 +20,9 @@ class GCN(nn.Module):
 
         return output
 
+
 class APPNP(nn.Module):
-    def __init__(self, num_s, hidden_dim = 3, alpha = 0.3, depth=3) -> None:
+    def __init__(self, num_s, hidden_dim=3, alpha=0.3, depth=3) -> None:
         super(APPNP, self).__init__()
         # self. = num_state
         self.num_s = num_s
@@ -42,27 +42,58 @@ class APPNP(nn.Module):
         transformed_seg = self.relu(self.mlp(seg))
         output = transformed_seg.contiguous()
         for _ in range(self.depth):
-            output = (1 - self.alpha) * torch.bmm(adj, output) + self.alpha * transformed_seg
-        
+            output = (1 - self.alpha) * torch.bmm(
+                adj, output
+            ) + self.alpha * transformed_seg
+
         # 需要残差吗？
         return output
 
+
 class GAT(nn.Module):
-    def __init__(self, num_s, hidden_dim = 3, num_head = 3, depth = 2, activation = nn.ELU()) -> None:
+    def __init__(
+        self, num_s, hidden_dim=3, num_head=3, depth=2, activation=nn.ELU()
+    ) -> None:
         super(GAT, self).__init__()
         self.num_s = num_s
         self.gat_layers = nn.ModuleList()
         self.depth = depth
         self.activation = activation
-        
-        self.gat_layers.append(GATConv(in_feats=num_s, out_feats=hidden_dim, num_heads=num_head, feat_drop=0.3, attn_drop=0.3,
-                                residual=True, activation=self.activation))
-        for _ in range(1, depth-1):
-            self.gat_layers.append(GATConv(in_feats=hidden_dim * num_head, out_feats=hidden_dim, num_heads=num_head, 
-                                            feat_drop=0.3, attn_drop=0.3, residual=True, activation=self.activation))
-                                            
-        self.gat_layers.append(GATConv(in_feats=hidden_dim * num_head, out_feats=num_s, num_heads=num_head,
-                                            feat_drop=0.3, attn_drop=0.3, residual=True))
+
+        self.gat_layers.append(
+            GATConv(
+                in_feats=num_s,
+                out_feats=hidden_dim,
+                num_heads=num_head,
+                feat_drop=0.3,
+                attn_drop=0.3,
+                residual=True,
+                activation=self.activation,
+            )
+        )
+        for _ in range(1, depth - 1):
+            self.gat_layers.append(
+                GATConv(
+                    in_feats=hidden_dim * num_head,
+                    out_feats=hidden_dim,
+                    num_heads=num_head,
+                    feat_drop=0.3,
+                    attn_drop=0.3,
+                    residual=True,
+                    activation=self.activation,
+                )
+            )
+
+        self.gat_layers.append(
+            GATConv(
+                in_feats=hidden_dim * num_head,
+                out_feats=num_s,
+                num_heads=num_head,
+                feat_drop=0.3,
+                attn_drop=0.3,
+                residual=True,
+            )
+        )
 
     def forward(self, seg, adj):
         n, c, h, w = seg.size()
@@ -70,7 +101,7 @@ class GAT(nn.Module):
 
         output_list = []
         for index in range(n):
-            seg_now, adj_now= seg[index], adj[index]
+            seg_now, adj_now = seg[index], adj[index]
             # print("\nseg_now.shape:", seg_now.shape, "adj_now.shape:", adj_now.shape)
             u, v = torch.where(adj_now > 0)
             g = dgl.graph((u, v))
@@ -79,17 +110,18 @@ class GAT(nn.Module):
             fea = seg_now
             for l in range(self.depth - 1):
                 fea = self.gat_layers[l](g, fea).flatten(1)
-            
+
             fea = self.gat_layers[-1](g, fea).mean(1)
-            
+
             output_list.append(fea)
-        
+
         output = torch.stack(output_list, dim=0)
         return output.view(n, -1, self.num_s)
 
+
 # 思路来自 SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks
 class Adj_Process(nn.Module):
-    def __init__(self, F = nn.ReLU()) -> None:
+    def __init__(self, F=nn.ReLU()) -> None:
         super(Adj_Process, self).__init__()
         self.F = F
 
@@ -104,20 +136,23 @@ class Adj_Process(nn.Module):
         adj = (adj + torch.transpose(adj, 1, 2)) / 2
 
         # 归一化, adj 为加入了自环的邻接矩阵
-        adj = adj + torch.diag_embed(torch.ones(adj.shape[0], adj.shape[1])).cuda() # 加入自环，可能可以不要
+        adj = (
+            adj + torch.diag_embed(torch.ones(adj.shape[0], adj.shape[1])).cuda()
+        )  # 加入自环，可能可以不要
         degree_mat = torch.sum(adj, dim=2)
         degree_mat = torch.diag_embed(torch.pow(degree_mat, -0.5))
         degree_mat[torch.isinf(degree_mat)] = 0
         adj = torch.bmm(degree_mat, adj)
         adj = torch.bmm(adj, degree_mat)
 
-        
-        
         return adj
+
 
 """
 num_s 1x1 卷积后每个点的维度
 """
+
+
 class EAGCN(nn.Module):
     def __init__(self, num_in, plane_mid, mids, normalize=False):
         super(EAGCN, self).__init__()
@@ -142,7 +177,7 @@ class EAGCN(nn.Module):
         self.adj_process = Adj_Process()
 
     def forward(self, seg_ori, edge_ori):
-        # 
+        #
         epsilon = 0.2
 
         seg = seg_ori
@@ -155,7 +190,7 @@ class EAGCN(nn.Module):
 
         # print("seg.shape:", seg.shape)
         # print("theta.shape:", theta.shape)
-        
+
         channel_att = torch.relu(
             self.mlp(self.maxpool_c(seg).squeeze(3).squeeze(2))
         ).view(n, self.num_s, -1)
@@ -199,14 +234,25 @@ class EAGCN(nn.Module):
         ext_up_seg_gcn = seg_gcn
         return ext_up_seg_gcn, similarity
 
+
 class AG_EAGCN(nn.Module):
-    def __init__(self, num_in, plane_mid, mids, depth=3, alpha = 0.5, epsilon = 0.2, postgnn = "APPNP", agg_type = "mean") -> None:
+    def __init__(
+        self,
+        num_in,
+        plane_mid,
+        mids,
+        depth=3,
+        alpha=0.5,
+        epsilon=0.2,
+        postgnn="APPNP",
+        agg_type="mean",
+    ) -> None:
         super(AG_EAGCN, self).__init__()
 
         self.eagcn = EAGCN(num_in, plane_mid, mids)
         self.adj_process = Adj_Process()
         self.agg_type = agg_type
-        
+
         if self.agg_type == "attention":
             self.agg_conv = nn.Conv1d(depth, depth, kernel_size=1)
 
@@ -215,9 +261,10 @@ class AG_EAGCN(nn.Module):
         elif postgnn == "GAT":
             self.post_gnn = GAT(num_s=num_in)
         elif postgnn == "GCN":
-            self.post_gnn = GCN(num_state=num_in, )
+            self.post_gnn = GCN(
+                num_state=num_in,
+            )
 
-    
     def forward(self, seg, edge, depth=3):
         sample_num, c, h, w = seg.size()
 
@@ -233,9 +280,9 @@ class AG_EAGCN(nn.Module):
             adj = sum(adj_list)
         elif self.agg_type == "attention":
             adj = torch.stack(adj_list, dim=1)
-            
+
         # 聚合后的邻接矩阵如用GAT必须一定程度稀疏化，否则无法反映重复出现的边的可信度
-        
+
         # 稀疏化阈值
         post_epsilon = 0.0
         adj = self.adj_process(adj, post_epsilon)
@@ -252,7 +299,6 @@ class AG_EAGCN(nn.Module):
         dirichlet_energy = torch.trace(adj[0])
         for i in range(1, adj.shape[0]):
             dirichlet_energy += torch.trace(adj[i])
-        
 
         gamma = 0.1
         beta = 0.1
@@ -261,17 +307,17 @@ class AG_EAGCN(nn.Module):
         ones = torch.ones((sample_num, n, 1)).cuda()
         ones_T = torch.ones((sample_num, 1, n)).cuda()
         # print("adj.shape:", adj.shape, "ones.shape:", ones.shape)
-        f_A = - beta * torch.bmm(ones_T, torch.log(torch.bmm(adj, ones))) / n  + gamma * torch.norm(adj) / (n ** 2)
+        f_A = -beta * torch.bmm(
+            ones_T, torch.log(torch.bmm(adj, ones))
+        ) / n + gamma * torch.norm(adj) / (n**2)
 
         # dirichlet_energy 控制同质性的满足，f_A 控制不出现 A=0
         graph_regulation = alpha * dirichlet_energy + f_A
-
 
         output = self.post_gnn(ori_seg, adj)
 
         output = output.reshape(-1, c, h, w)
         return output, graph_regulation
-
 
 
 class GRU_EAGCN(nn.Module):
