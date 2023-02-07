@@ -56,6 +56,12 @@ parser.add_argument(
     "--polar_transform", type=bool, default=False, help="polar transform pre-process"
 )
 parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
+parser.add_argument(
+    "--aggregation_mode",
+    type=str,
+    default="sum",
+    help="adjacency matrix aggregation mode",
+)
 
 args = parser.parse_args()
 
@@ -64,8 +70,8 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}_{}_bs_beta_{}_base_lr_{}".format(
-        args.postgnn, args.batch_size, args.beta, args.base_lr
+    + "_{}_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        args.postgnn, args.aggregation_mode, args.batch_size, args.beta, args.base_lr
     )
 )
 
@@ -227,7 +233,7 @@ if __name__ == "__main__":
                     model, validloader
                 )
                 with open(model_performance_log_path, "a") as f:
-                    p_log = "iter: {}   cup_dice_mean: {:.4f}   cup_dice_up95: {:.4f}   cup_dice_low95:{:.4f}\n".format(
+                    p_log = "iter: {}   cup_dice_mean: {:.4f}   cup_dice_up95: {:.4f}   cup_dice_low95: {:.4f}\n".format(
                         iter_num, cup_dice_mean, cup_dice_up95, cup_dice_low95
                     )
                     f.write(p_log)

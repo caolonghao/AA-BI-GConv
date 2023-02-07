@@ -245,15 +245,15 @@ class AG_EAGCN(nn.Module):
         alpha=0.5,
         epsilon=0.2,
         postgnn="APPNP",
-        agg_type="mean",
+        aggregation_mode="mean",
     ) -> None:
         super(AG_EAGCN, self).__init__()
 
         self.eagcn = EAGCN(num_in, plane_mid, mids)
         self.adj_process = Adj_Process()
-        self.agg_type = agg_type
+        self.aggregation_mode = aggregation_mode
 
-        if self.agg_type == "attention":
+        if self.aggregation_mode == "attention":
             self.agg_conv = nn.Conv1d(depth, depth, kernel_size=1)
 
         if postgnn == "APPNP":
@@ -274,11 +274,11 @@ class AG_EAGCN(nn.Module):
             seg, adj = self.eagcn(seg, edge)
             adj_list.append(adj)
 
-        if self.agg_type == "mean":
+        if self.aggregation_mode == "mean":
             adj = sum(adj_list) / len(adj_list)
-        elif self.agg_type == "sum":
+        elif self.aggregation_mode == "sum":
             adj = sum(adj_list)
-        elif self.agg_type == "attention":
+        elif self.aggregation_mode == "attention":
             adj = torch.stack(adj_list, dim=1)
 
         # 聚合后的邻接矩阵如用GAT必须一定程度稀疏化，否则无法反映重复出现的边的可信度
