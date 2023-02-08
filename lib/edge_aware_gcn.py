@@ -259,7 +259,7 @@ class AG_EAGCN(nn.Module):
         if postgnn == "APPNP":
             self.post_gnn = APPNP(num_s=num_in, depth=depth, alpha=alpha)
         elif postgnn == "GAT":
-            self.post_gnn = GAT(num_s=num_in)
+            self.post_gnn = GAT(num_s=num_in, depth=2)
         elif postgnn == "GCN":
             self.post_gnn = GCN(
                 num_state=num_in,
@@ -279,6 +279,7 @@ class AG_EAGCN(nn.Module):
         elif self.aggregation_mode == "sum":
             adj = sum(adj_list)
         elif self.aggregation_mode == "attention":
+            # NOTE: not completed yet
             adj = torch.stack(adj_list, dim=1)
 
         # 聚合后的邻接矩阵如用GAT必须一定程度稀疏化，否则无法反映重复出现的边的可信度

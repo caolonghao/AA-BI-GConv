@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--root_path", type=str, default="../segmentation_data", help="Name of Experiment"
 )
-parser.add_argument("--exp", type=str, default="oc_od/ODOC_BMVC", help="model_name")
+parser.add_argument("--exp", type=str, default="oc_od/ALL_DATA_AUG", help="model_name")
 parser.add_argument(
     "--max_iterations", type=int, default=50000, help="maximum epoch number to train"
 )
@@ -34,7 +34,7 @@ parser.add_argument("--base_lr", type=float, default=0.006, help="learning rate"
 parser.add_argument(
     "--deterministic", type=int, default=1, help="whether use deterministic training"
 )
-parser.add_argument("--seed", type=int, default=1337, help="random seed")
+parser.add_argument("--seed", type=int, default=42, help="random seed")
 parser.add_argument("--gpu", type=str, default="0", help="GPU to use")
 parser.add_argument(
     "--beta",
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.info(str(args))
 
-    model = ODOC_seg_edge()
+    model = ODOC_seg_edge(postgnn=args.postgnn)
     model = model.cuda()
 
     db_train = ODOC(base_dir=train_data_path, split="train")
@@ -221,7 +221,7 @@ if __name__ == "__main__":
             )
 
             #  save every 1000 item_num
-            if iter_num % 1000 == 0:
+            if iter_num % 10 == 0:
                 save_mode_path = os.path.join(
                     snapshot_path, "iter_" + str(iter_num) + ".pth"
                 )

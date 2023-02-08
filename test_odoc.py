@@ -10,9 +10,9 @@ from utils.utils import model_test
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--root_path", type=str, default="your_folder/oc_od", help="Name of Experiment"
+    "--root_path", type=str, default="../segmentation_data", help="Name of Experiment"
 )
-parser.add_argument("--exp", type=str, default="oc_od/ODOC_BMVC", help="model_name")
+parser.add_argument("--exp", type=str, default="oc_od/ALL_DATA_AUG", help="model_name")
 parser.add_argument(
     "--max_iterations", type=int, default=50000, help="maximum epoch number to train"
 )
@@ -20,7 +20,7 @@ parser.add_argument("--batch_size", type=int, default=48, help="batch_size per g
 parser.add_argument(
     "--base_lr", type=float, default=0.006, help="maximum epoch number to train"
 )
-parser.add_argument("--seed", type=int, default=1337, help="random seed")
+parser.add_argument("--seed", type=int, default=42, help="random seed")
 parser.add_argument("--gpu", type=str, default="0", help="GPU to use")
 parser.add_argument(
     "--beta",
