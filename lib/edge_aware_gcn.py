@@ -271,7 +271,7 @@ class AG_EAGCN(nn.Module):
         elif postgnn == "GAT":
             self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
         elif postgnn == "GCN":
-            self.post_gnn = GCN(
+            self.post_gnn = GCN_layer(
                 num_state=num_in,
             )
 
