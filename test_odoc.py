@@ -48,8 +48,14 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
-        args.postgnn, args.aggregation_mode, args.batch_size, args.beta, args.base_lr
+    + "_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        args.postgnn_depth,
+        args.postgnn,
+        args.prop_nums,
+        args.aggregation_mode,
+        args.batch_size,
+        args.beta,
+        args.base_lr,
     )
 )
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu

@@ -72,7 +72,7 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+    + "_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
         args.postgnn_depth,
         args.postgnn,
         args.prop_nums,
