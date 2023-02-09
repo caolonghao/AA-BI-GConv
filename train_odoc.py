@@ -62,6 +62,8 @@ parser.add_argument(
     default="sum",
     help="adjacency matrix aggregation mode",
 )
+parser.add_argument("--postgnn_depth", type=int, default=3, help="Depths of PostGNN")
+parser.add_argument("--prop_nums", type=int, default=3, help="Propagation numbers")
 
 args = parser.parse_args()
 
@@ -70,8 +72,14 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
-        args.postgnn, args.aggregation_mode, args.batch_size, args.beta, args.base_lr
+    + "{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        args.postgnn_depth,
+        args.postgnn,
+        args.prop_nums,
+        args.aggregation_mode,
+        args.batch_size,
+        args.beta,
+        args.base_lr,
     )
 )
 
@@ -127,7 +135,12 @@ if __name__ == "__main__":
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.info(str(args))
 
-    model = ODOC_seg_edge(postgnn=args.postgnn)
+    model = ODOC_seg_edge(
+        postgnn=args.postgnn,
+        postgnn_depth=args.postgnn_depth,
+        prop_nums=args.prop_nums,
+        aggregation_mode=args.aggregation_mode,
+    )
     model = model.cuda()
 
     db_train = ODOC(base_dir=train_data_path, split="train")

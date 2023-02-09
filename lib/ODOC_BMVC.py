@@ -67,7 +67,14 @@ class EDGModule(nn.Module):
 
 
 class SEG_Module(nn.Module):
-    def __init__(self, channel, postgnn="APPNP", aggregation_mode="mean"):
+    def __init__(
+        self,
+        channel,
+        postgnn="APPNP",
+        postgnn_depth=3,
+        aggregation_mode="mean",
+        prop_nums=3,
+    ):
         super(SEG_Module, self).__init__()
         self.relu = nn.ReLU(True)
 
@@ -87,15 +94,17 @@ class SEG_Module(nn.Module):
 
         self.conv5 = nn.Conv2d(4 * channel, 2, 1)
 
-        print("postgnn_type:", postgnn)
+        print("postgnn:", postgnn, "postgnn_depth:", postgnn_depth)
+        print("aggregation_mode:", aggregation_mode, "prop_nums:", prop_nums)
         self.GCN = AG_EAGCN(
             num_in=2,
             plane_mid=1,
             mids=32,
-            depth=8,
             alpha=0.3,
             postgnn=postgnn,
+            postgnn_depth=postgnn_depth,
             aggregation_mode=aggregation_mode,
+            prop_nums=prop_nums,
         )
 
     def forward(self, x1, x2, x3, edge):
@@ -121,7 +130,14 @@ class SEG_Module(nn.Module):
 
 
 class ODOC_seg_edge(nn.Module):
-    def __init__(self, channel=64, postgnn="APPNP", aggregation_mode="sum"):
+    def __init__(
+        self,
+        channel=64,
+        postgnn="APPNP",
+        postgnn_depth=3,
+        aggregation_mode="sum",
+        prop_nums=3,
+    ):
         super(ODOC_seg_edge, self).__init__()
 
         self.resnet = res2net50_v1b_26w_4s(pretrained=True)
@@ -133,7 +149,9 @@ class ODOC_seg_edge(nn.Module):
 
         self.edge = EDGModule(channel)
 
-        self.seg_layer = SEG_Module(channel, postgnn, aggregation_mode)
+        self.seg_layer = SEG_Module(
+            channel, postgnn, postgnn_depth, aggregation_mode, prop_nums
+        )
 
     def forward(self, x):
         x = self.resnet.conv1(x)

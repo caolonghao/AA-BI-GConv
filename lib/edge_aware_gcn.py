@@ -241,36 +241,38 @@ class AG_EAGCN(nn.Module):
         num_in,
         plane_mid,
         mids,
-        depth=3,
         alpha=0.5,
         epsilon=0.2,
         postgnn="APPNP",
+        postgnn_depth=3,
         aggregation_mode="mean",
+        prop_nums=3,
     ) -> None:
         super(AG_EAGCN, self).__init__()
 
         self.eagcn = EAGCN(num_in, plane_mid, mids)
         self.adj_process = Adj_Process()
+        self.prop_nums = prop_nums
         self.aggregation_mode = aggregation_mode
 
         if self.aggregation_mode == "attention":
-            self.agg_conv = nn.Conv1d(depth, depth, kernel_size=1)
+            self.agg_conv = nn.Conv1d(self.prop_nums, self.prop_nums, kernel_size=1)
 
         if postgnn == "APPNP":
-            self.post_gnn = APPNP(num_s=num_in, depth=depth, alpha=alpha)
+            self.post_gnn = APPNP(num_s=num_in, depth=postgnn_depth, alpha=alpha)
         elif postgnn == "GAT":
-            self.post_gnn = GAT(num_s=num_in, depth=2)
+            self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
         elif postgnn == "GCN":
             self.post_gnn = GCN(
                 num_state=num_in,
             )
 
-    def forward(self, seg, edge, depth=3):
+    def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
 
         adj_list = []
         ori_seg = seg
-        for i in range(depth):
+        for i in range(self.prop_nums):
             seg, adj = self.eagcn(seg, edge)
             adj_list.append(adj)
 
