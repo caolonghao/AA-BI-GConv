@@ -140,7 +140,7 @@ class ODOC_seg_edge(nn.Module):
     ):
         super(ODOC_seg_edge, self).__init__()
 
-        self.resnet = res2net50_v1b_26w_4s(pretrained=True)
+        self.resnet = res2net50_v1b_26w_4s(pretrained=False)
 
         self.rfb2_1 = BasicConv2d(256, channel, 1)
         self.rfb3_1 = BasicConv2d(512, channel, 1)

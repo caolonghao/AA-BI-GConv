@@ -234,7 +234,7 @@ if __name__ == "__main__":
             )
 
             #  save every 1000 item_num
-            if iter_num % 10 == 0:
+            if iter_num % 1000 == 0:
                 save_mode_path = os.path.join(
                     snapshot_path, "iter_" + str(iter_num) + ".pth"
                 )

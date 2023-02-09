@@ -4,9 +4,9 @@ import torch.nn as nn
 from dgl.nn.pytorch.conv import GATConv
 
 
-class GCN(nn.Module):
+class GCN_layer(nn.Module):
     def __init__(self, num_state):
-        super(GCN, self).__init__()
+        super(GCN_layer, self).__init__()
         self.num_state = num_state
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv1d(num_state, num_state, kernel_size=1)
@@ -99,6 +99,14 @@ class GAT(nn.Module):
         n, c, h, w = seg.size()
         seg = seg.view(n, -1, self.num_s).contiguous()
 
+        # kNN稀疏化，否则对于GAT而言边数过多，且无强度区分
+        a, _ = adj.topk(k=h * w // 6, dim=2)
+        adj_min = torch.min(a, dim=-1).values
+        adj_min = adj_min.unsqueeze(-1).repeat(1, 1, adj.shape[-1])
+        ge = torch.ge(adj, adj_min)
+        zeros = torch.zeros_like(adj)
+        adj = torch.where(ge, adj, zeros)
+
         output_list = []
         for index in range(n):
             seg_now, adj_now = seg[index], adj[index]
@@ -171,7 +179,7 @@ class EAGCN(nn.Module):
         self.softmax = nn.Softmax(dim=1)
         self.downsample = nn.AdaptiveAvgPool2d(output_size=(mids, mids))
 
-        self.gcn = GCN(num_state=num_in)
+        self.gcn = GCN_layer(num_state=num_in)
         self.conv_extend = nn.Conv2d(self.num_s, num_in, kernel_size=1)
         self.blocker = nn.BatchNorm2d(num_in)
         self.adj_process = Adj_Process()
