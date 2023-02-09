@@ -1,6 +1,7 @@
 import dgl
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from dgl.nn.pytorch.conv import GATConv
 
 
@@ -19,6 +20,30 @@ class GCN_layer(nn.Module):
         output = out + seg
 
         return output
+
+
+class GCN(nn.Module):
+    def __init__(self, num_s, hidden_dim, depth=2):
+        super(GCN, self).__init__()
+        self.depth = depth
+        self.linear_list = nn.ModuleList()
+        self.num_s = num_s
+
+        self.linear_list.append(nn.Linear(num_s, hidden_dim))
+        for _ in range(1, depth - 1):
+            self.linear_list.append(nn.Linear(hidden_dim, hidden_dim))
+        self.linear_list.append(nn.Linear(hidden_dim, num_s))
+
+    def forward(self, seg, adj):
+        n, c, h, w = seg.size()
+        seg = seg.view(n, -1, self.num_s).contiguous()
+
+        output = seg
+        for i in range(self.depth):
+            output = torch.bmm(adj, output)
+            output = self.linear_list[i](output)
+            output = F.relu(output)
+        return output + seg
 
 
 class APPNP(nn.Module):
@@ -271,9 +296,7 @@ class AG_EAGCN(nn.Module):
         elif postgnn == "GAT":
             self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
         elif postgnn == "GCN":
-            self.post_gnn = GCN_layer(
-                num_state=num_in,
-            )
+            self.post_gnn = GCN(num_s=num_in, hidden_dim=3, depth=postgnn_depth)
 
     def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
@@ -288,9 +311,9 @@ class AG_EAGCN(nn.Module):
             adj = sum(adj_list) / len(adj_list)
         elif self.aggregation_mode == "sum":
             adj = sum(adj_list)
-        elif self.aggregation_mode == "attention":
-            # NOTE: not completed yet
+        elif self.aggregation_mode == "max":
             adj = torch.stack(adj_list, dim=1)
+            adj, _ = torch.max(adj, dim=1)
 
         # 聚合后的邻接矩阵如用GAT必须一定程度稀疏化，否则无法反映重复出现的边的可信度
 
@@ -329,33 +352,3 @@ class AG_EAGCN(nn.Module):
 
         output = output.reshape(-1, c, h, w)
         return output, graph_regulation
-
-
-class GRU_EAGCN(nn.Module):
-    def __init__(self, num_in, plane_mid, mids):
-        super(GRU_EAGCN, self).__init__()
-
-        self.eagcn = EAGCN(num_in, plane_mid, mids)
-        self.rnn = torch.nn.GRU(input_size=1024, hidden_size=1024, num_layers=1)
-
-    def forward(self, seg, edge):
-        _, c, h, w = seg.size()
-        # ------------t0-------#
-        updated_seg, _ = self.eagcn(seg, edge)
-        updated_seg = updated_seg.view(c, -1, h * w)
-        output_0, h_0 = self.rnn(updated_seg)
-        # ------------t1-------#
-        output = output_0.view(-1, c, h, w)
-        updated_seg, _ = self.eagcn(output, edge)
-        updated_seg = updated_seg.view(c, -1, h * w)
-        output_1, h_1 = self.rnn(updated_seg, h_0)
-        # -------------t2----------#
-        output = output_1.view(-1, c, h, w)
-        updated_seg, _ = self.eagcn(output, edge)
-        updated_seg = updated_seg.view(c, -1, h * w)
-        output_2, h_2 = self.rnn(updated_seg, h_1)
-
-        # reshape back
-        output_2 = output_2.view(-1, c, h, w)
-
-        return output_2
