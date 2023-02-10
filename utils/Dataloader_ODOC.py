@@ -2,11 +2,13 @@ import os
 
 import albumentations as A
 import h5py
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
-from .utils import polar_transform
+from .utils import polar_inv_transform, polar_transform
 
 
 class ODOC(Dataset):
@@ -72,32 +74,45 @@ class ODOC(Dataset):
     def __getitem__(self, idx):
         image_name = self.image_list[idx]
         h5f = h5py.File(self._base_dir + "/h5py_all" + "/" + image_name, "r")
-        image = h5f["img"][:]
-        label_cup = h5f["mask"][:, :, 0]
-        label_disc = h5f["mask"][:, :, 1]
-        con_gau_cup = h5f["con_gau"][:, :, 0]
-        con_gau_disc = h5f["con_gau"][:, :, 1]
+        image = h5f["img"][:].astype(np.uint8)
+        label_cup = h5f["mask"][:, :, 0].astype(np.uint8)
+        label_disc = h5f["mask"][:, :, 1].astype(np.uint8)
+        con_gau_cup = h5f["con_gau"][:, :, 0].astype(np.uint8)
+        con_gau_disc = h5f["con_gau"][:, :, 1].astype(np.uint8)
 
         # debug
-        # _image = polar_inv_transform(image)
+        # _image = polar_transform(image)
         # plt.imshow(_image)
         # plt.show()
 
+        pre_process = A.Resize(256, 256)
+        masks = [label_cup, label_disc, con_gau_cup, con_gau_disc]
+        transformed = pre_process(image=image, masks=masks)
+        image = transformed["image"]
+        label_cup, label_disc, con_gau_cup, con_gau_disc = transformed["masks"]
+
+        # 如果使用了极坐标变换，则应当使用最原始的gt，防止gt不在圆的范围内;因为用来监督的mask也应当是极坐标变换后的
+        ori_label_cup, ori_label_disc, ori_con_gau_cup, ori_con_gau_disc = (
+            label_cup,
+            label_disc,
+            con_gau_cup,
+            con_gau_disc,
+        )
+
         if self.is_train:
-            # (
-            #     image,
-            #     label_cup,
-            #     label_disc,
-            #     con_gau_cup,
-            #     con_gau_disc,
-            # ) = self._random_rotate_and_flip(
-            #     image,
-            #     label_cup,
-            #     label_disc,
-            #     con_gau_cup,
-            #     con_gau_disc,
-            # )
             if self.polar_trans is True:
+                # plt.subplot(131)
+                # plt.imshow(image)
+                # image = polar_transform(image)
+
+                # plt.subplot(132)
+                # plt.imshow(image)
+
+                # plt.subplot(133)
+                # _image = polar_inv_transform(image)
+                # plt.imshow(_image)
+                # plt.show()
+
                 image = polar_transform(image)
                 label_cup = polar_transform(label_cup)
                 label_disc = polar_transform(label_disc)
@@ -131,6 +146,14 @@ class ODOC(Dataset):
             con_gau_disc = self.transform(con_gau_disc)
             con_gau = torch.cat((con_gau_cup, con_gau_disc), 0)
 
+            ori_label_cup = self.transform(ori_label_cup)
+            ori_label_disc = self.transform(ori_label_disc)
+            ori_label = torch.cat((ori_label_cup, ori_label_disc), 0)
+
+            ori_con_gau_cup = self.transform(ori_con_gau_cup)
+            ori_con_gau_disc = self.transform(ori_con_gau_disc)
+            ori_con_gau = torch.cat((ori_con_gau_cup, ori_con_gau_disc), 0)
+
             sample = {"img": image, "mask": label, "con_gau": con_gau}
 
             return sample
@@ -143,5 +166,5 @@ class ODOC(Dataset):
             image = self.test_transform(image)
             label = self.transform(h5f["mask"][:])
             con_gau = self.transform(h5f["con_gau"][:])
-            sample = {"img": image, "mask": label, "con_gau": con_gau}
+            sample = {"img": image, "ori_mask": ori_label, "ori_con_gau": ori_con_gau}
         return sample

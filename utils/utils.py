@@ -8,20 +8,22 @@ from sklearn.metrics import balanced_accuracy_score, jaccard_score
 
 # Optional ROI 极坐标变换
 def polar_transform(image):
+    flags = cv2.INTER_LINEAR | cv2.WARP_FILL_OUTLIERS
     center = (image.shape[1] // 2, image.shape[0] // 2)
-    _image = cv2.linearPolar(
-        src=image, center=center, maxRadius=center[0], flags=cv2.WARP_FILL_OUTLIERS
-    )
+    maxRadius = min(center[0], center[1])
+    _image = cv2.linearPolar(src=image, center=center, maxRadius=maxRadius, flags=flags)
     return cv2.rotate(_image, cv2.ROTATE_90_CLOCKWISE)
 
 
 def polar_inv_transform(image):
+    flags = cv2.WARP_FILL_OUTLIERS | cv2.WARP_INVERSE_MAP
     center = (image.shape[1] // 2, image.shape[0] // 2)
+    maxRadius = min(center[0], center[1])
     _image = cv2.linearPolar(
         src=cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE),
         center=center,
-        maxRadius=center[0],
-        flags=cv2.WARP_FILL_OUTLIERS + cv2.WARP_INVERSE_MAP,
+        maxRadius=maxRadius,
+        flags=flags,
     )
     return _image
 
@@ -45,7 +47,7 @@ def calculate_metric_percase(pred, gt):
     return dice, jc, dice2, bc
 
 
-def model_test(model, test_loader):
+def model_test(model, test_loader, apply_polar_transform=False):
     model.eval()
     with torch.no_grad():
         total_metric_cup = 0.0
@@ -58,8 +60,8 @@ def model_test(model, test_loader):
         for i_batch, sampled_batch in enumerate(test_loader):
             volume_batch, label_batch, edge_batch = (
                 sampled_batch["img"],
-                sampled_batch["mask"],
-                sampled_batch["con_gau"],
+                sampled_batch["ori_mask"],
+                sampled_batch["ori_con_gau"],
             )
             volume_batch, label_batch, edge_batch = (
                 volume_batch.type(torch.FloatTensor),
@@ -103,6 +105,10 @@ def model_test(model, test_loader):
 
             y_map_gt_cup = y_pre_gt[0, ...].astype(np.uint8)
             y_map_gt_disc = y_pre_gt[1, ...].astype(np.uint8)
+
+            if apply_polar_transform is True:
+                y_map_cup = polar_inv_transform(y_map_cup)
+                y_map_disc = polar_inv_transform(y_map_disc)
 
             # plt.figure()
             # plt.subplot(2, 2, 1)

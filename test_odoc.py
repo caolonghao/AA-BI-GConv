@@ -17,8 +17,9 @@ parser.add_argument(
     "--max_iterations", type=int, default=50000, help="maximum epoch number to train"
 )
 parser.add_argument("--batch_size", type=int, default=48, help="batch_size per gpu")
+parser.add_argument("--base_lr", type=float, default=0.006, help="learning rate")
 parser.add_argument(
-    "--base_lr", type=float, default=0.006, help="maximum epoch number to train"
+    "--deterministic", type=int, default=1, help="whether use deterministic training"
 )
 parser.add_argument("--seed", type=int, default=42, help="random seed")
 parser.add_argument("--gpu", type=str, default="0", help="GPU to use")
@@ -28,11 +29,21 @@ parser.add_argument(
     default=0.1,
     help="balance factor to control edge and body loss",
 )
+parser.add_argument("--clip", type=float, default=0.5, help="gradient clipping margin")
 parser.add_argument(
-    "--alpha",
-    type=float,
-    default=0,
-    help="balance factor to control consistency loss and body loss",
+    "--decay_rate", type=float, default=0.6, help="decay rate of learning rate"
+)
+parser.add_argument(
+    "--decay_itetations",
+    type=int,
+    default=30000,
+    help="every n itetations decay learning rate",
+)
+parser.add_argument(
+    "--polar_transform",
+    default=False,
+    action=argparse.BooleanOptionalAction,
+    help="polar transform pre-process",
 )
 parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
 parser.add_argument(
@@ -41,14 +52,18 @@ parser.add_argument(
     default="sum",
     help="adjacency matrix aggregation mode",
 )
+parser.add_argument("--postgnn_depth", type=int, default=3, help="Depths of PostGNN")
+parser.add_argument("--prop_nums", type=int, default=3, help="Propagation numbers")
 
 args = parser.parse_args()
+
 
 train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+    + "{}polar_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        int(args.polar_transform),
         args.postgnn_depth,
         args.postgnn,
         args.prop_nums,
@@ -73,4 +88,6 @@ if __name__ == "__main__":
     best_performance = 0.0
     model.load_state_dict(torch.load(saved_model_path))
     print("Test Start...")
-    model_test(model=model, test_loader=testloader)
+    model_test(
+        model=model, test_loader=testloader, apply_polar_transform=args.polar_transform
+    )

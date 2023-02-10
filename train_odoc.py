@@ -53,7 +53,10 @@ parser.add_argument(
     help="every n itetations decay learning rate",
 )
 parser.add_argument(
-    "--polar_transform", type=bool, default=False, help="polar transform pre-process"
+    "--polar_transform",
+    default=False,
+    action=argparse.BooleanOptionalAction,
+    help="polar transform pre-process",
 )
 parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
 parser.add_argument(
@@ -72,7 +75,8 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+    + "{}polar_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        int(args.polar_transform),
         args.postgnn_depth,
         args.postgnn,
         args.prop_nums,
@@ -143,8 +147,16 @@ if __name__ == "__main__":
     )
     model = model.cuda()
 
-    db_train = ODOC(base_dir=train_data_path, split="train")
-    db_valid = ODOC(base_dir=train_data_path, split="valid")
+    apply_polar_transform = args.polar_transform
+    if apply_polar_transform is True:
+        print("Apply Polar Transform.")
+
+    db_train = ODOC(
+        base_dir=train_data_path, split="train", polar_trans=apply_polar_transform
+    )
+    db_valid = ODOC(
+        base_dir=train_data_path, split="valid", polar_trans=apply_polar_transform
+    )
 
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
@@ -243,7 +255,7 @@ if __name__ == "__main__":
 
                 print("Validation: ...")
                 cup_dice_mean, cup_dice_up95, cup_dice_low95 = model_test(
-                    model, validloader
+                    model, validloader, args.polar_transform
                 )
                 with open(model_performance_log_path, "a") as f:
                     p_log = "iter: {}   cup_dice_mean: {:.4f}   cup_dice_up95: {:.4f}   cup_dice_low95: {:.4f}\n".format(
