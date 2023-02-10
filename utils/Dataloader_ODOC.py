@@ -55,6 +55,7 @@ class ODOC(Dataset):
             [
                 A.HorizontalFlip(p=0.3),
                 A.VerticalFlip(p=0.3),
+                # A.Rotate(limit=30),
                 A.OneOf(
                     [
                         A.ChannelShuffle(p=0.3),
@@ -62,8 +63,22 @@ class ODOC(Dataset):
                         A.ColorJitter(),
                     ]
                 ),
-                # A.ShiftScaleRotate(),
                 A.ToGray(p=0.3),
+                A.CLAHE(),
+            ]
+        )
+
+        # 极坐标下的增强只关注对比度
+        self.polar_augmentation = A.Compose(
+            [
+                A.OneOf(
+                    [
+                        A.ChannelShuffle(),
+                        A.FancyPCA(),
+                        A.ColorJitter(),
+                    ]
+                ),
+                A.ToGray(),
                 A.CLAHE(),
             ]
         )
@@ -92,47 +107,54 @@ class ODOC(Dataset):
         label_cup, label_disc, con_gau_cup, con_gau_disc = transformed["masks"]
 
         # 如果使用了极坐标变换，则应当使用最原始的gt，防止gt不在圆的范围内;因为用来监督的mask也应当是极坐标变换后的
-        ori_label_cup, ori_label_disc, ori_con_gau_cup, ori_con_gau_disc = (
+        ori_image, ori_label_cup, ori_label_disc, ori_con_gau_cup, ori_con_gau_disc = (
+            image,
             label_cup,
             label_disc,
             con_gau_cup,
             con_gau_disc,
         )
 
+        if self.polar_trans is True:
+            # plt.subplot(131)
+            # plt.imshow(image)
+            # image = polar_transform(image)
+
+            # plt.subplot(132)
+            # plt.imshow(image)
+
+            # plt.subplot(133)
+            # _image = polar_inv_transform(image)
+            # plt.imshow(_image)
+            # plt.show()
+
+            image = polar_transform(image)
+            label_cup = polar_transform(label_cup)
+            label_disc = polar_transform(label_disc)
+            con_gau_cup = polar_transform(con_gau_cup)
+            con_gau_disc = polar_transform(con_gau_disc)
+        
         if self.is_train:
-            if self.polar_trans is True:
-                # plt.subplot(131)
-                # plt.imshow(image)
-                # image = polar_transform(image)
-
-                # plt.subplot(132)
-                # plt.imshow(image)
-
-                # plt.subplot(133)
-                # _image = polar_inv_transform(image)
-                # plt.imshow(_image)
-                # plt.show()
-
-                image = polar_transform(image)
-                label_cup = polar_transform(label_cup)
-                label_disc = polar_transform(label_disc)
-                con_gau_cup = polar_transform(con_gau_cup)
-                con_gau_disc = polar_transform(con_gau_disc)
-            else:
-                masks = [label_cup, label_disc, con_gau_cup, con_gau_disc]
+            masks = [label_cup, label_disc, con_gau_cup, con_gau_disc]
+            if self.polar_augmentation is False:
                 transformed = self.augmentation(image=image, masks=masks)
-                image = transformed["image"]
-                label_cup, label_disc, con_gau_cup, con_gau_disc = transformed["masks"]
+            else:
+                transformed = self.polar_augmentation(image=image, masks=masks)
+            
+            image = transformed["image"]
+            label_cup, label_disc, con_gau_cup, con_gau_disc = transformed["masks"]
 
             # print("label_cup.shape:", label_cup.shape)
             # print("label_disc.shape:", label_disc.shape)
             # print("image.type:", type(image))
             # # print("label_cup.shape:", label_cup.size())
-            # plt.subplot(311)
+            # plt.subplot(221)
+            # plt.imshow(ori_image)
+            # plt.subplot(222)
             # plt.imshow(image)
-            # plt.subplot(312)
+            # plt.subplot(223)
             # plt.imshow(label_cup)
-            # plt.subplot(313)
+            # plt.subplot(224)
             # plt.imshow(label_disc)
             # plt.show()
 
@@ -146,14 +168,6 @@ class ODOC(Dataset):
             con_gau_disc = self.transform(con_gau_disc)
             con_gau = torch.cat((con_gau_cup, con_gau_disc), 0)
 
-            ori_label_cup = self.transform(ori_label_cup)
-            ori_label_disc = self.transform(ori_label_disc)
-            ori_label = torch.cat((ori_label_cup, ori_label_disc), 0)
-
-            ori_con_gau_cup = self.transform(ori_con_gau_cup)
-            ori_con_gau_disc = self.transform(ori_con_gau_disc)
-            ori_con_gau = torch.cat((ori_con_gau_cup, ori_con_gau_disc), 0)
-
             sample = {"img": image, "mask": label, "con_gau": con_gau}
 
             return sample
@@ -164,7 +178,13 @@ class ODOC(Dataset):
             image = h5f["img"][:]
             # image = A.clahe(image)
             image = self.test_transform(image)
-            label = self.transform(h5f["mask"][:])
-            con_gau = self.transform(h5f["con_gau"][:])
+            ori_label_cup = self.transform(ori_label_cup)
+            ori_label_disc = self.transform(ori_label_disc)
+            ori_label = torch.cat((ori_label_cup, ori_label_disc), 0)
+
+            ori_con_gau_cup = self.transform(ori_con_gau_cup)
+            ori_con_gau_disc = self.transform(ori_con_gau_disc)
+            ori_con_gau = torch.cat((ori_con_gau_cup, ori_con_gau_disc), 0)
+
             sample = {"img": image, "ori_mask": ori_label, "ori_con_gau": ori_con_gau}
         return sample
