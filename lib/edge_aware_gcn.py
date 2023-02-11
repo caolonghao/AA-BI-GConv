@@ -134,7 +134,7 @@ class GAT(nn.Module):
         n, c, h, w = seg.size()
         seg = seg.view(n, -1, self.num_s).contiguous()
 
-        adj = kNN_sparse(adj)
+        adj = kNN_sparse(adj, sparse_factor=8)
 
         output_list = []
         for index in range(n):
@@ -162,13 +162,13 @@ class Adj_Process(nn.Module):
         super(Adj_Process, self).__init__()
         self.F = F
 
-    def forward(self, adj, epsilon, K=6):
+    def forward(self, adj, epsilon=0, sparse_factor=1):
         # 数值非负化
         adj = self.F(adj)
 
         # 稀疏化
-        # adj[adj < epsilon] = 0
-        adj = kNN_sparse(adj, K)
+        adj[adj < epsilon] = 0
+        adj = kNN_sparse(adj, sparse_factor)
 
         # 对称化
         adj = (adj + torch.transpose(adj, 1, 2)) / 2
@@ -237,7 +237,7 @@ class EAGCN(nn.Module):
         similarity_c = torch.bmm(theta, diag_channel_att)
         similarity_c = torch.bmm(similarity_c, theta_T)
 
-        similarity_c = self.adj_process(similarity_c, epsilon=0.15)
+        similarity_c = self.adj_process(similarity_c, sparse_factor=8)
         # 每个节点可以去到多个点，softmax不合理
         # similarity_c = self.softmax(torch.bmm(similarity_c, theta_T))
 
@@ -257,13 +257,13 @@ class EAGCN(nn.Module):
         diag_spatial_att = torch.bmm(edge_mm, seg_ss)
         similarity_s = sigma_out * diag_spatial_att
 
-        similarity_s = self.adj_process(similarity_s, epsilon=0.15)
+        similarity_s = self.adj_process(similarity_s, sparse_factor=8)
         # 同之前对similarity_c的处理
         # similarity_s = self.softmax(diag_spatial_att)
         similarity = similarity_c + similarity_s
 
         # 这里直接相加，边权有些可能比较极端，例如大于1或者非常接近0，可以归一化然后阈值卡一下
-        similarity = self.adj_process(similarity, epsilon=0.0)
+        similarity = self.adj_process(similarity)
 
         seg_gcn = self.gcn(seg, similarity).view(n, self.num_in, self.mids, self.mids)
 
@@ -294,8 +294,6 @@ class AG_EAGCN(nn.Module):
         self.aggregation_mode = aggregation_mode
         self.postgnn_name = postgnn
 
-        if self.aggregation_mode == "attention":
-            self.agg_conv = nn.Conv1d(self.prop_nums, self.prop_nums, kernel_size=1)
 
         if postgnn == "APPNP":
             self.post_gnn = APPNP(num_s=num_in, depth=postgnn_depth, alpha=alpha)
