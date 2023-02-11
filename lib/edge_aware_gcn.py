@@ -167,7 +167,7 @@ class Adj_Process(nn.Module):
         adj = self.F(adj)
 
         # 稀疏化
-        adj[adj < epsilon] = 0
+        adj = torch.where(adj<epsilon, 0, adj)
         adj = kNN_sparse(adj, sparse_factor)
 
         # 对称化
