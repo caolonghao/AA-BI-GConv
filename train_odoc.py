@@ -220,7 +220,7 @@ if __name__ == "__main__":
 
             edge_loss = dice_loss(edge_outputs.squeeze(), edge_batch_com.float())
 
-            loss = region_loss + args.beta * edge_loss
+            loss = region_loss + args.beta * edge_loss + graph_regulation_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -235,13 +235,14 @@ if __name__ == "__main__":
             writer.add_scalar("loss/edge_loss", edge_loss, iter_num)
 
             logging.info(
-                "iteration %d : loss : %f, cup_loss: %f, disc_loss: %f, edge_loss: %f"
+                "iteration %d : loss : %f, cup_loss: %f, disc_loss: %f, edge_loss: %f, graph_regulation_loss: %f"
                 % (
                     iter_num,
                     loss.item(),
                     cup_loss.item(),
                     disc_loss.item(),
                     edge_loss.item(),
+                    graph_regulation_loss.item()
                 )
             )
 

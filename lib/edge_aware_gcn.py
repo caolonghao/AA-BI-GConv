@@ -340,9 +340,9 @@ class AG_EAGCN(nn.Module):
         for i in range(1, adj.shape[0]):
             dirichlet_energy += torch.trace(adj[i])
 
-        gamma = 0.1
-        beta = 0.1
-        alpha = 0.1
+        gamma = 1
+        beta = 0.5
+        alpha = 1
         n = adj.shape[1]
         ones = torch.ones((sample_num, n, 1)).cuda()
         ones_T = torch.ones((sample_num, 1, n)).cuda()
@@ -350,6 +350,7 @@ class AG_EAGCN(nn.Module):
         f_A = -beta * torch.bmm(
             ones_T, torch.log(torch.bmm(adj, ones))
         ) / n + gamma * torch.norm(adj) / (n**2)
+        f_A = torch.sum(f_A, dim=0)
 
         # dirichlet_energy 控制同质性的满足，f_A 控制不出现 A=0
         graph_regulation = alpha * dirichlet_energy + f_A
