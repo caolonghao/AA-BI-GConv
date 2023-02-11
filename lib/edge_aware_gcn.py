@@ -5,6 +5,16 @@ import torch.nn.functional as F
 from dgl.nn.pytorch.conv import GATConv
 
 
+def kNN_sparse(adj, sparse_factor = 6):
+    # kNN稀疏化，否则对于GAT而言边数过多，且无强度区分
+    a, _ = adj.topk(k=adj.shape[-1] // sparse_factor, dim=2)
+    adj_min = torch.min(a, dim=-1).values
+    adj_min = adj_min.unsqueeze(-1).repeat(1, 1, adj.shape[-1])
+    ge = torch.ge(adj, adj_min)
+    zeros = torch.zeros_like(adj)
+    adj = torch.where(ge, adj, zeros)
+    return adj
+
 class GCN_layer(nn.Module):
     def __init__(self, num_state):
         super(GCN_layer, self).__init__()
@@ -124,13 +134,7 @@ class GAT(nn.Module):
         n, c, h, w = seg.size()
         seg = seg.view(n, -1, self.num_s).contiguous()
 
-        # kNN稀疏化，否则对于GAT而言边数过多，且无强度区分
-        a, _ = adj.topk(k=h * w // 6, dim=2)
-        adj_min = torch.min(a, dim=-1).values
-        adj_min = adj_min.unsqueeze(-1).repeat(1, 1, adj.shape[-1])
-        ge = torch.ge(adj, adj_min)
-        zeros = torch.zeros_like(adj)
-        adj = torch.where(ge, adj, zeros)
+        adj = kNN_sparse(adj)
 
         output_list = []
         for index in range(n):
@@ -158,12 +162,13 @@ class Adj_Process(nn.Module):
         super(Adj_Process, self).__init__()
         self.F = F
 
-    def forward(self, adj, epsilon):
+    def forward(self, adj, epsilon, K=6):
         # 数值非负化
-        # adj = self.F(adj)
+        adj = self.F(adj)
 
         # 稀疏化
-        adj[adj < epsilon] = 0
+        # adj[adj < epsilon] = 0
+        adj = kNN_sparse(adj, K)
 
         # 对称化
         adj = (adj + torch.transpose(adj, 1, 2)) / 2
@@ -287,6 +292,7 @@ class AG_EAGCN(nn.Module):
         self.adj_process = Adj_Process()
         self.prop_nums = prop_nums
         self.aggregation_mode = aggregation_mode
+        self.postgnn_name = postgnn
 
         if self.aggregation_mode == "attention":
             self.agg_conv = nn.Conv1d(self.prop_nums, self.prop_nums, kernel_size=1)
@@ -297,6 +303,8 @@ class AG_EAGCN(nn.Module):
             self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
         elif postgnn == "GCN":
             self.post_gnn = GCN(num_s=num_in, hidden_dim=3, depth=postgnn_depth)
+        elif postgnn == "MLP":
+            self.post_gnn = nn.Linear(in_features=num_in, out_features=num_in)
 
     def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
@@ -348,7 +356,10 @@ class AG_EAGCN(nn.Module):
         # dirichlet_energy 控制同质性的满足，f_A 控制不出现 A=0
         graph_regulation = alpha * dirichlet_energy + f_A
 
-        output = self.post_gnn(ori_seg, adj)
+        if self.postgnn_name != "MLP":
+            output = self.post_gnn(ori_seg, adj)
+        else:
+            output = self.post_gnn(ori_seg.view(-1, h*w, c))
 
         output = output.reshape(-1, c, h, w)
         return output, graph_regulation

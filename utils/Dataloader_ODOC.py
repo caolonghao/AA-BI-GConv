@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
+import cv2
 
 from .utils import polar_inv_transform, polar_transform
 
@@ -117,14 +118,15 @@ class ODOC(Dataset):
 
         if self.polar_trans is True:
             # plt.subplot(131)
+            # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             # plt.imshow(image)
-            # image = polar_transform(image)
+            # _image = polar_transform(image)
 
             # plt.subplot(132)
-            # plt.imshow(image)
+            # plt.imshow(_image)
 
             # plt.subplot(133)
-            # _image = polar_inv_transform(image)
+            # _image = polar_inv_transform(_image)
             # plt.imshow(_image)
             # plt.show()
 

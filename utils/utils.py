@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from medpy import metric
 from sklearn.metrics import balanced_accuracy_score, jaccard_score
+import matplotlib.pyplot as plt
 
 
 # Optional ROI 极坐标变换
@@ -110,16 +111,24 @@ def model_test(model, test_loader, apply_polar_transform=False):
                 y_map_cup = polar_inv_transform(y_map_cup)
                 y_map_disc = polar_inv_transform(y_map_disc)
 
-            # plt.figure()
-            # plt.subplot(2, 2, 1)
-            # plt.imshow(y_map_cup, cmap="gray")
-            # plt.subplot(2, 2, 2)
-            # plt.imshow(y_map_disc, cmap="gray")
-            # plt.subplot(2, 2, 3)
-            # plt.imshow(y_map_gt_cup, cmap="gray")
-            # plt.subplot(2, 2, 4)
-            # plt.imshow(y_map_gt_disc, cmap="gray")
-            # plt.show()
+            def debug_imshow():
+                plt.figure()
+                plt.subplot(3, 2, 1)
+                plt.imshow(y_map_cup, cmap="gray")
+                plt.subplot(3, 2, 2)
+                plt.imshow(y_map_disc, cmap="gray")
+                plt.subplot(3, 2, 3)
+                plt.imshow(y_map_gt_cup, cmap="gray")
+                plt.subplot(3, 2, 4)
+                plt.imshow(y_map_gt_disc, cmap="gray")
+                
+                plt.subplot(3, 2, 5)
+                plt.imshow(polar_transform(y_map_cup), cmap="gray")
+                plt.subplot(3, 2, 6)
+                plt.imshow(polar_transform(y_map_disc), cmap="gray")
+                plt.show()
+            
+            # debug_imshow()
 
             single_metric_cup = calculate_metric_percase(y_map_cup, y_map_gt_cup)
             total_metric_cup += np.asarray(single_metric_cup)
