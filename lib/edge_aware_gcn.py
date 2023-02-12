@@ -237,7 +237,7 @@ class EAGCN(nn.Module):
         similarity_c = torch.bmm(theta, diag_channel_att)
         similarity_c = torch.bmm(similarity_c, theta_T)
 
-        similarity_c = self.adj_process(similarity_c, sparse_factor=8)
+        similarity_c = self.adj_process(similarity_c, epsilon=0.15, sparse_factor=2)
         # 每个节点可以去到多个点，softmax不合理
         # similarity_c = self.softmax(torch.bmm(similarity_c, theta_T))
 
@@ -257,7 +257,7 @@ class EAGCN(nn.Module):
         diag_spatial_att = torch.bmm(edge_mm, seg_ss)
         similarity_s = sigma_out * diag_spatial_att
 
-        similarity_s = self.adj_process(similarity_s, sparse_factor=8)
+        similarity_s = self.adj_process(similarity_s, epsilon=0.15, sparse_factor=2)
         # 同之前对similarity_c的处理
         # similarity_s = self.softmax(diag_spatial_att)
         similarity = similarity_c + similarity_s
@@ -340,9 +340,9 @@ class AG_EAGCN(nn.Module):
         for i in range(1, adj.shape[0]):
             dirichlet_energy += torch.trace(adj[i])
 
-        gamma = 1
-        beta = 0.5
-        alpha = 1
+        gamma = 0.1
+        beta = 0.05
+        alpha = 0.001
         n = adj.shape[1]
         ones = torch.ones((sample_num, n, 1)).cuda()
         ones_T = torch.ones((sample_num, 1, n)).cuda()
