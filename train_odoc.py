@@ -114,17 +114,21 @@ if __name__ == "__main__":
     # make logger file
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
-    if os.path.exists(snapshot_path + "/code"):
-        shutil.rmtree(snapshot_path + "/code")
+
+    code_path = snapshot_path + "/code"
+    if os.path.exists(code_path):
+        shutil.rmtree(code_path)
 
     model_performance_log_path = os.path.join(snapshot_path, "performance_log.txt")
 
     if os.path.exists(model_performance_log_path):
         os.remove(model_performance_log_path)
 
-    # shutil.copytree(
-    #     ".", snapshot_path + "/code", shutil.ignore_patterns([".git", "__pycache__"])
-    # )
+    
+    ignore = shutil.ignore_patterns(".git", "__pycache__")
+    shutil.copytree(
+        src=".", dst=code_path, ignore=ignore
+    )
 
     log_path = snapshot_path + "/log.txt"
     if os.path.exists(log_path):
@@ -220,7 +224,7 @@ if __name__ == "__main__":
 
             edge_loss = dice_loss(edge_outputs.squeeze(), edge_batch_com.float())
 
-            loss = region_loss + args.beta * edge_loss + graph_regulation_loss
+            loss = region_loss + args.beta * edge_loss + 0.01 * graph_regulation_loss
 
             optimizer.zero_grad()
             loss.backward()
