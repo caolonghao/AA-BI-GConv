@@ -237,7 +237,7 @@ class EAGCN(nn.Module):
         similarity_c = torch.bmm(theta, diag_channel_att)
         similarity_c = torch.bmm(similarity_c, theta_T)
 
-        similarity_c = self.adj_process(similarity_c, epsilon=0.15, sparse_factor=2)
+        similarity_c = self.adj_process(similarity_c, epsilon=0.01, sparse_factor=1)
         # 每个节点可以去到多个点，softmax不合理
         # similarity_c = self.softmax(torch.bmm(similarity_c, theta_T))
 
@@ -257,13 +257,14 @@ class EAGCN(nn.Module):
         diag_spatial_att = torch.bmm(edge_mm, seg_ss)
         similarity_s = sigma_out * diag_spatial_att
 
-        similarity_s = self.adj_process(similarity_s, epsilon=0.15, sparse_factor=2)
+        similarity_s = self.adj_process(similarity_s, epsilon=0.01, sparse_factor=1)
         # 同之前对similarity_c的处理
         # similarity_s = self.softmax(diag_spatial_att)
         similarity = similarity_c + similarity_s
 
         # 这里直接相加，边权有些可能比较极端，例如大于1或者非常接近0，可以归一化然后阈值卡一下
         similarity = self.adj_process(similarity)
+        return similarity
 
         seg_gcn = self.gcn(seg, similarity).view(n, self.num_in, self.mids, self.mids)
 
@@ -293,7 +294,7 @@ class AG_EAGCN(nn.Module):
         self.prop_nums = prop_nums
         self.aggregation_mode = aggregation_mode
         self.postgnn_name = postgnn
-
+        self.single_layer_prop = GCN_layer(num_in)
 
         if postgnn == "APPNP":
             self.post_gnn = APPNP(num_s=num_in, depth=postgnn_depth, alpha=alpha)
@@ -307,10 +308,26 @@ class AG_EAGCN(nn.Module):
     def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
 
+        lamb = 0.5
+        mu = 0.7
         adj_list = []
         ori_seg = seg
-        for i in range(self.prop_nums):
-            seg, adj = self.eagcn(seg, edge)
+        adj_0 = self.eagcn(seg, edge)
+        adj = adj_0
+        seg = self.single_layer_prop(ori_seg, adj).view(sample_num, c, h, w)
+        adj_list.append(adj)
+        
+        for i in range(1, self.prop_nums):
+            adj_next = self.eagcn(seg, edge)
+            
+            # adj_0 对应初始生成的图，adj 对应上一次的，adj_next对应这一次计算出来的
+            if self.aggregation_mode == "shift_agg":
+                adj = lamb * adj_0 + (1 - lamb) * (mu * adj + (1 - mu) * adj_next)
+            else:
+                adj = adj_next
+            
+            # 这里可以看情况决定加不加残差
+            seg = self.single_layer_prop(ori_seg, adj).view(sample_num, c, h, w)
             adj_list.append(adj)
 
         if self.aggregation_mode == "mean":
@@ -320,6 +337,9 @@ class AG_EAGCN(nn.Module):
         elif self.aggregation_mode == "max":
             adj = torch.stack(adj_list, dim=1)
             adj, _ = torch.max(adj, dim=1)
+        elif self.aggregation_mode == "shift_agg":
+            # 此时adj就是最后想要的adj
+            pass
 
         # 聚合后的邻接矩阵如用GAT必须一定程度稀疏化，否则无法反映重复出现的边的可信度
 

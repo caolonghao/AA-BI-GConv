@@ -224,7 +224,7 @@ if __name__ == "__main__":
 
             edge_loss = dice_loss(edge_outputs.squeeze(), edge_batch_com.float())
 
-            loss = region_loss + args.beta * edge_loss + 0.01 * graph_regulation_loss
+            loss = region_loss + args.beta * edge_loss
 
             optimizer.zero_grad()
             loss.backward()
