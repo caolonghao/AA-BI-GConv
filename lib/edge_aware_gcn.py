@@ -130,7 +130,8 @@ class Adj_Process(nn.Module):
         # adj = self.F(adj)
 
         # 稀疏化
-        adj[adj < epsilon] = 0
+        # adj[adj < epsilon] = 0
+        adj = torch.where(adj<epsilon, 0, adj)
 
         # 对称化
         adj = (adj + torch.transpose(adj, 1, 2)) / 2

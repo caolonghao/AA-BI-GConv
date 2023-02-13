@@ -1,12 +1,25 @@
 import argparse
+import logging
 import os
+import random
+import shutil
+import sys
 
+import numpy as np
 import torch
+import torch.backends.cudnn as cudnn
+from tensorboardX import SummaryWriter
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from lib.ODOC_BMVC import ODOC_seg_edge
+from utils.criterion import BinaryDiceLoss
 from utils.Dataloader_ODOC import ODOC
-from utils.utils import model_test
+from utils.utils import clip_gradient, model_test
+
+# os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -17,8 +30,9 @@ parser.add_argument(
     "--max_iterations", type=int, default=50000, help="maximum epoch number to train"
 )
 parser.add_argument("--batch_size", type=int, default=48, help="batch_size per gpu")
+parser.add_argument("--base_lr", type=float, default=0.006, help="learning rate")
 parser.add_argument(
-    "--base_lr", type=float, default=0.006, help="maximum epoch number to train"
+    "--deterministic", type=int, default=1, help="whether use deterministic training"
 )
 parser.add_argument("--seed", type=int, default=42, help="random seed")
 parser.add_argument("--gpu", type=str, default="0", help="GPU to use")
@@ -28,11 +42,21 @@ parser.add_argument(
     default=0.1,
     help="balance factor to control edge and body loss",
 )
+parser.add_argument("--clip", type=float, default=0.5, help="gradient clipping margin")
 parser.add_argument(
-    "--alpha",
-    type=float,
-    default=0,
-    help="balance factor to control consistency loss and body loss",
+    "--decay_rate", type=float, default=0.6, help="decay rate of learning rate"
+)
+parser.add_argument(
+    "--decay_itetations",
+    type=int,
+    default=30000,
+    help="every n itetations decay learning rate",
+)
+parser.add_argument(
+    "--polar_transform",
+    default=False,
+    action=argparse.BooleanOptionalAction,
+    help="polar transform pre-process",
 )
 parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
 parser.add_argument(
@@ -41,15 +65,25 @@ parser.add_argument(
     default="sum",
     help="adjacency matrix aggregation mode",
 )
+parser.add_argument("--postgnn_depth", type=int, default=3, help="Depths of PostGNN")
+parser.add_argument("--prop_nums", type=int, default=3, help="Propagation numbers")
 
 args = parser.parse_args()
+
 
 train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "_{}_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
-        args.postgnn, args.aggregation_mode, args.batch_size, args.beta, args.base_lr
+    + "{}polar_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        int(args.polar_transform),
+        args.postgnn_depth,
+        args.postgnn,
+        args.prop_nums,
+        args.aggregation_mode,
+        args.batch_size,
+        args.beta,
+        args.base_lr,
     )
 )
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -59,7 +93,12 @@ saved_model_path = os.path.join(snapshot_path, "best_model.pth")
 
 
 if __name__ == "__main__":
-    model = ODOC_seg_edge(postgnn=args.postgnn, aggregation_mode=args.aggregation_mode)
+    model = ODOC_seg_edge(
+        postgnn=args.postgnn,
+        postgnn_depth=args.postgnn_depth,
+        prop_nums=args.prop_nums,
+        aggregation_mode=args.aggregation_mode,
+    )
     model = model.cuda()
 
     db_test = ODOC(base_dir=train_data_path, split="test")

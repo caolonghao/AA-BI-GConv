@@ -53,7 +53,10 @@ parser.add_argument(
     help="every n itetations decay learning rate",
 )
 parser.add_argument(
-    "--polar_transform", type=bool, default=False, help="polar transform pre-process"
+    "--polar_transform",
+    default=False,
+    action=argparse.BooleanOptionalAction,
+    help="polar transform pre-process",
 )
 parser.add_argument("--postgnn", type=str, default="APPNP", help="PostGNN Type")
 parser.add_argument(
@@ -72,7 +75,8 @@ train_data_path = args.root_path
 snapshot_path = (
     "../model/"
     + args.exp
-    + "{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+    + "{}polar_{}layer_{}_{}_props_{}_aggregate_{}_bs_beta_{}_base_lr_{}".format(
+        int(args.polar_transform),
         args.postgnn_depth,
         args.postgnn,
         args.prop_nums,
@@ -110,17 +114,21 @@ if __name__ == "__main__":
     # make logger file
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
-    if os.path.exists(snapshot_path + "/code"):
-        shutil.rmtree(snapshot_path + "/code")
+
+    code_path = snapshot_path + "/code"
+    if os.path.exists(code_path):
+        shutil.rmtree(code_path)
 
     model_performance_log_path = os.path.join(snapshot_path, "performance_log.txt")
 
     if os.path.exists(model_performance_log_path):
         os.remove(model_performance_log_path)
 
-    # shutil.copytree(
-    #     ".", snapshot_path + "/code", shutil.ignore_patterns([".git", "__pycache__"])
-    # )
+    
+    ignore = shutil.ignore_patterns(".git", "__pycache__")
+    shutil.copytree(
+        src=".", dst=code_path, ignore=ignore
+    )
 
     log_path = snapshot_path + "/log.txt"
     if os.path.exists(log_path):
@@ -143,8 +151,16 @@ if __name__ == "__main__":
     )
     model = model.cuda()
 
-    db_train = ODOC(base_dir=train_data_path, split="train")
-    db_valid = ODOC(base_dir=train_data_path, split="valid")
+    apply_polar_transform = args.polar_transform
+    if apply_polar_transform is True:
+        print("Apply Polar Transform.")
+
+    db_train = ODOC(
+        base_dir=train_data_path, split="train"
+    )
+    db_valid = ODOC(
+        base_dir=train_data_path, split="valid"
+    )
 
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
@@ -234,7 +250,7 @@ if __name__ == "__main__":
             )
 
             #  save every 1000 item_num
-            if iter_num % 10 == 0:
+            if iter_num % 1000 == 0:
                 save_mode_path = os.path.join(
                     snapshot_path, "iter_" + str(iter_num) + ".pth"
                 )

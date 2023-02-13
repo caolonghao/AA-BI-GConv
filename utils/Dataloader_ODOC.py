@@ -84,19 +84,6 @@ class ODOC(Dataset):
         # plt.show()
 
         if self.is_train:
-            # (
-            #     image,
-            #     label_cup,
-            #     label_disc,
-            #     con_gau_cup,
-            #     con_gau_disc,
-            # ) = self._random_rotate_and_flip(
-            #     image,
-            #     label_cup,
-            #     label_disc,
-            #     con_gau_cup,
-            #     con_gau_disc,
-            # )
             if self.polar_trans is True:
                 image = polar_transform(image)
                 label_cup = polar_transform(label_cup)
