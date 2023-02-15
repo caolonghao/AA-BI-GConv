@@ -3,6 +3,16 @@ import torch
 import torch.nn as nn
 from dgl.nn.pytorch.conv import GATConv
 
+def kNN_sparse(adj, sparse_factor = 6):
+    # kNN稀疏化，否则对于GAT而言边数过多，且无强度区分
+    a, _ = adj.topk(k=adj.shape[-1] // sparse_factor, dim=2)
+    adj_min = torch.min(a, dim=-1).values
+    adj_min = adj_min.unsqueeze(-1).repeat(1, 1, adj.shape[-1])
+    ge = torch.ge(adj, adj_min)
+    zeros = torch.zeros_like(adj)
+    adj = torch.where(ge, adj, zeros)
+    return adj
+
 
 class GCN(nn.Module):
     def __init__(self, num_state):
