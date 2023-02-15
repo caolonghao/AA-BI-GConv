@@ -1,6 +1,7 @@
 import dgl
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from dgl.nn.pytorch.conv import GATConv
 
 def kNN_sparse(adj, sparse_factor = 6):
@@ -30,6 +31,28 @@ class GCN(nn.Module):
 
         return output
 
+class Multi_layer_GCN(nn.Module):
+    def __init__(self, num_s, hidden_dim, depth=2):
+        super(Multi_layer_GCN, self).__init__()
+        self.depth = depth
+        self.linear_list = nn.ModuleList()
+        self.num_s = num_s
+
+        self.linear_list.append(nn.Linear(num_s, hidden_dim))
+        for _ in range(1, depth - 1):
+            self.linear_list.append(nn.Linear(hidden_dim, hidden_dim))
+        self.linear_list.append(nn.Linear(hidden_dim, num_s))
+
+    def forward(self, seg, adj):
+        n, c, h, w = seg.size()
+        seg = seg.view(n, -1, self.num_s).contiguous()
+
+        output = seg
+        for i in range(self.depth):
+            output = torch.bmm(adj, output)
+            output = self.linear_list[i](output)
+            output = F.relu(output)
+        return output + seg
 
 class APPNP(nn.Module):
     def __init__(self, num_s, hidden_dim=3, alpha=0.3, depth=3) -> None:
