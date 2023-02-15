@@ -314,9 +314,9 @@ class AG_EAGCN(nn.Module):
             adj = sum(adj_list) / len(adj_list)
         elif self.aggregation_mode == "sum":
             adj = sum(adj_list)
-        elif self.aggregation_mode == "attention":
-            # NOTE: not completed yet
+        elif self.aggregation_mode == "max":
             adj = torch.stack(adj_list, dim=1)
+            adj, _ = torch.max(torch, dim=1)
 
         # 聚合后的邻接矩阵如用GAT必须一定程度稀疏化，否则无法反映重复出现的边的可信度
 
