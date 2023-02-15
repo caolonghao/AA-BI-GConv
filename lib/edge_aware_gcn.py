@@ -32,7 +32,7 @@ class GCN(nn.Module):
         return output
 
 class Multi_layer_GCN(nn.Module):
-    def __init__(self, num_s, hidden_dim, depth=2):
+    def __init__(self, num_s, hidden_dim=3, depth=2):
         super(Multi_layer_GCN, self).__init__()
         self.depth = depth
         self.linear_list = nn.ModuleList()
@@ -158,13 +158,15 @@ class Adj_Process(nn.Module):
         super(Adj_Process, self).__init__()
         self.F = F
 
-    def forward(self, adj, epsilon):
+    def forward(self, adj, epsilon=0, sparse_factor=1):
         # 数值非负化
         # adj = self.F(adj)
 
         # 稀疏化
         # adj[adj < epsilon] = 0
         adj = torch.where(adj<epsilon, 0, adj)
+        if sparse_factor != 1:
+            adj = kNN_sparse(adj, sparse_factor)
 
         # 对称化
         adj = (adj + torch.transpose(adj, 1, 2)) / 2
@@ -297,9 +299,7 @@ class AG_EAGCN(nn.Module):
         elif postgnn == "GAT":
             self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
         elif postgnn == "GCN":
-            self.post_gnn = GCN(
-                num_state=num_in,
-            )
+            self.post_gnn = Multi_layer_GCN(num_s=num_in, depth=postgnn)
 
     def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
