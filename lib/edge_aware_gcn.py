@@ -14,6 +14,36 @@ def kNN_sparse(adj, sparse_factor = 6):
     adj = torch.where(ge, adj, zeros)
     return adj
 
+def calc_graph_regulation(seg, adj):
+    # Graph Regulation - Idea from: Iterative Deep Graph Learning for Graph Neural Networks: Better and Robust Node Embeddings
+    batch_size, c, h, w = seg.shape
+    _seg = seg.reshape(-1, h * w, c)
+    degree_mat = torch.sum(adj, dim=2)
+    degree_mat = torch.diag_embed(degree_mat)
+    # print("_seg.shape:", _seg.shape, "adj.shape:", adj.shape, "degree_mat.shape:", degree_mat.shape)
+    Laplacian_mat = degree_mat - adj
+    _seg_T = torch.transpose(_seg, 2, 1)
+    smoothness_mat = torch.bmm(_seg_T, Laplacian_mat)
+    smoothness_mat = torch.bmm(smoothness_mat, _seg)
+    dirichlet_energy = torch.trace(adj[0])
+    for i in range(1, adj.shape[0]):
+        dirichlet_energy += torch.trace(adj[i])
+
+    gamma = 0.1
+    beta = 0.1
+    alpha = 0.1
+    n = adj.shape[1]
+    ones = torch.ones((batch_size, n, 1)).cuda()
+    ones_T = torch.ones((batch_size, 1, n)).cuda()
+    # print("adj.shape:", adj.shape, "ones.shape:", ones.shape)
+    f_A = -beta * torch.bmm(
+        ones_T, torch.log(torch.bmm(adj, ones))
+    ) / n + gamma * torch.norm(adj) / (n**2)
+
+    # dirichlet_energy 控制同质性的满足，f_A 控制不出现 A=0
+    graph_regulation = alpha * dirichlet_energy + f_A
+    
+    return graph_regulation
 
 class GCN(nn.Module):
     def __init__(self, num_state):
@@ -321,37 +351,12 @@ class AG_EAGCN(nn.Module):
         post_epsilon = 0.0
         adj = self.adj_process(adj, post_epsilon)
 
-        # Graph Regulation - Idea from: Iterative Deep Graph Learning for Graph Neural Networks: Better and Robust Node Embeddings
-        _seg = seg.reshape(-1, h * w, c)
-        degree_mat = torch.sum(adj, dim=2)
-        degree_mat = torch.diag_embed(degree_mat)
-        # print("_seg.shape:", _seg.shape, "adj.shape:", adj.shape, "degree_mat.shape:", degree_mat.shape)
-        Laplacian_mat = degree_mat - adj
-        _seg_T = torch.transpose(_seg, 2, 1)
-        smoothness_mat = torch.bmm(_seg_T, Laplacian_mat)
-        smoothness_mat = torch.bmm(smoothness_mat, _seg)
-        dirichlet_energy = torch.trace(adj[0])
-        for i in range(1, adj.shape[0]):
-            dirichlet_energy += torch.trace(adj[i])
-
-        gamma = 0.1
-        beta = 0.1
-        alpha = 0.1
-        n = adj.shape[1]
-        ones = torch.ones((sample_num, n, 1)).cuda()
-        ones_T = torch.ones((sample_num, 1, n)).cuda()
-        # print("adj.shape:", adj.shape, "ones.shape:", ones.shape)
-        f_A = -beta * torch.bmm(
-            ones_T, torch.log(torch.bmm(adj, ones))
-        ) / n + gamma * torch.norm(adj) / (n**2)
-
-        # dirichlet_energy 控制同质性的满足，f_A 控制不出现 A=0
-        graph_regulation = alpha * dirichlet_energy + f_A
+        grapg_regulation_loss = calc_graph_regulation(seg, adj)
 
         output = self.post_gnn(ori_seg, adj)
 
         output = output.reshape(-1, c, h, w)
-        return output, graph_regulation
+        return output, grapg_regulation_loss
 
 class AGGRU_EAGCN(nn.Module):
     def __init__(
