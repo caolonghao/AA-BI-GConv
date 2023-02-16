@@ -416,10 +416,10 @@ class AGGRU_EAGCN(nn.Module):
             adj = torch.stack(adj_list, dim=1)
             adj, _ = torch.max(torch, dim=1)
         elif self.aggregation_mode == "GRU":
-            rnn_output, rnn_h = self.adj_gru(adj_list[0])
+            adj_output, adj_h = self.adj_gru(adj_list[0])
             for index in range(1, self.prop_nums):
-                rnn_output, rnn_h = self.adj_gru(adj_list[index], rnn_h)
-            adj = rnn_output.view(-1, h*w, h*w)
+                adj_output, adj_h = self.adj_gru(adj_list[index], adj_h)
+            adj = adj_output.view(-1, h*w, h*w)
 
         fea = rnn_output.view(-1, c, h, w)
         output = self.post_gnn(fea, adj)
