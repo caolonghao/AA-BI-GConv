@@ -382,23 +382,22 @@ class AGGRU_EAGCN(nn.Module):
     def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
 
-        adj_list = []
-        seg, adj = self.eagcn(seg, edge)
-        seg = seg.view(c, -1, h*w)
-        rnn_output, rnn_h = self.rnn(seg)
-        rnn_output = rnn_output.view(-1, c, h, w)
-        adj_list.append(adj)
-
-        for i in range(1, self.prop_nums):
-            # 这里每一次传播后的特征是否需要过rnn?
-            seg_new, adj = self.eagcn(rnn_output, edge)
+        adj_list = []            
+        seg_list = []
+        next_seg = seg.clone()
+        for _ in range(self.prop_nums):
+            seg_list.append(next_seg)
+            # 因为这时的next_seg已经是更新后的了，但adj是由更新前的seg生成的，为了对应，所以先append
+            next_seg, adj = self.eagcn(next_seg, edge)
             adj_list.append(adj)
-            seg_new = seg_new.view(c, -1, h*w)
-            rnn_output, rnn_h = self.rnn(seg_new, rnn_h)
-            rnn_output = rnn_output.view(-1, c, h, w)
-            
-        
 
+        # node feature aggreagation
+        rnn_output, rnn_h = self.rnn(seg_list[0].view(c, -1, h * w))
+        for index in range(1, self.prop_nums):
+            rnn_output, rnn_h = self.rnn(seg_list[index].view(c, -1, h * w), rnn_h)
+        rnn_output = rnn_output.view(-1, c, h, w)
+
+        # adjacency matrix aggregation
         if self.aggregation_mode == "mean":
             adj = sum(adj_list) / len(adj_list)
         elif self.aggregation_mode == "sum":
