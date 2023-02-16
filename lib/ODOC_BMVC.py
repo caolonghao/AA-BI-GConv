@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .edge_aware_gcn import AG_EAGCN
+from .edge_aware_gcn import AG_EAGCN, AGGRU_EAGCN
 from .Res2Net_v1b import res2net50_v1b_26w_4s
 
 
@@ -96,7 +96,7 @@ class SEG_Module(nn.Module):
 
         print("postgnn:", postgnn, "postgnn_depth:", postgnn_depth)
         print("aggregation_mode:", aggregation_mode, "prop_nums:", prop_nums)
-        self.GCN = AG_EAGCN(
+        self.GCN = AGGRU_EAGCN(
             num_in=2,
             plane_mid=1,
             mids=32,
