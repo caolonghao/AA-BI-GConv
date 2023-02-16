@@ -386,14 +386,17 @@ class AGGRU_EAGCN(nn.Module):
         seg, adj = self.eagcn(seg, edge)
         seg = seg.view(c, -1, h*w)
         rnn_output, rnn_h = self.rnn(seg)
+        rnn_output = rnn_output.view(-1, c, h, w)
         adj_list.append(adj)
 
         for i in range(1, self.prop_nums):
             # 这里每一次传播后的特征是否需要过rnn?
-            seg, adj = self.eagcn(rnn_output, edge)
-            seg = seg.view(c, -1, h*w)
-            rnn_output, rnn_h = self.rnn(rnn_output, rnn_h)
+            seg_new, adj = self.eagcn(rnn_output, edge)
             adj_list.append(adj)
+            seg_new = seg_new.view(c, -1, h*w)
+            rnn_output, rnn_h = self.rnn(seg_new, rnn_h)
+            rnn_output = rnn_output.view(-1, c, h, w)
+            
         
 
         if self.aggregation_mode == "mean":
@@ -407,7 +410,7 @@ class AGGRU_EAGCN(nn.Module):
         fea = rnn_output.view(-1, c, h, w)
         output = self.post_gnn(fea, adj)
         output = output.view(-1, c, h, w)
-        return output
+        return output, 0
 
 class GRU_EAGCN(nn.Module):
     def __init__(self, num_in, plane_mid, mids):
