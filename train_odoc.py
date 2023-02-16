@@ -151,6 +151,9 @@ if __name__ == "__main__":
     )
     model = model.cuda()
 
+    # load_path = snapshot_path + '/start_checkpoint.pth'
+    # model.load_state_dict(torch.load(load_path))
+
     apply_polar_transform = args.polar_transform
     if apply_polar_transform is True:
         print("Apply Polar Transform.")

@@ -291,9 +291,6 @@ class AG_EAGCN(nn.Module):
         self.prop_nums = prop_nums
         self.aggregation_mode = aggregation_mode
 
-        if self.aggregation_mode == "attention":
-            self.agg_conv = nn.Conv1d(self.prop_nums, self.prop_nums, kernel_size=1)
-
         if postgnn == "APPNP":
             self.post_gnn = APPNP(num_s=num_in, depth=postgnn_depth, alpha=alpha)
         elif postgnn == "GAT":
@@ -305,7 +302,7 @@ class AG_EAGCN(nn.Module):
         sample_num, c, h, w = seg.size()
 
         adj_list = []
-        ori_seg = seg
+        ori_seg = seg.clone()
         for i in range(self.prop_nums):
             seg, adj = self.eagcn(seg, edge)
             adj_list.append(adj)
