@@ -353,6 +353,61 @@ class AG_EAGCN(nn.Module):
         output = output.reshape(-1, c, h, w)
         return output, graph_regulation
 
+class AGGRU_EAGCN(nn.Module):
+    def __init__(
+        self,
+        num_in,
+        plane_mid,
+        mids,
+        alpha=0.5,
+        epsilon=0.2,
+        postgnn="APPNP",
+        postgnn_depth=3,
+        aggregation_mode="mean",
+        prop_nums=3,) -> None:
+        super(AGGRU_EAGCN, self).__init__()
+        self.eagcn = EAGCN(num_in, plane_mid, mids)
+        self.rnn = nn.GRU(input_size=1024, hidden_size=1024, num_layers=1)
+        self.adj_process = Adj_Process()
+        self.prop_nums = prop_nums
+        self.aggregation_mode = aggregation_mode
+
+        if postgnn == "APPNP":
+            self.post_gnn = APPNP(num_s=num_in, depth=postgnn_depth, alpha=alpha)
+        elif postgnn == "GAT":
+            self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
+        elif postgnn == "GCN":
+            self.post_gnn = Multi_layer_GCN(num_s=num_in, depth=postgnn)
+
+    def forward(self, seg, edge):
+        sample_num, c, h, w = seg.size()
+
+        adj_list = []
+        seg, adj = self.eagcn(seg, edge)
+        seg = seg.view(c, -1, h*w)
+        rnn_output, rnn_h = self.rnn(seg)
+        adj_list.append(adj)
+
+        for i in range(1, self.prop_nums):
+            # 这里每一次传播后的特征是否需要过rnn?
+            seg, adj = self.eagcn(rnn_output, edge)
+            seg = seg.view(c, -1, h*w)
+            rnn_output, rnn_h = self.rnn(rnn_output, rnn_h)
+            adj_list.append(adj)
+        
+
+        if self.aggregation_mode == "mean":
+            adj = sum(adj_list) / len(adj_list)
+        elif self.aggregation_mode == "sum":
+            adj = sum(adj_list)
+        elif self.aggregation_mode == "max":
+            adj = torch.stack(adj_list, dim=1)
+            adj, _ = torch.max(torch, dim=1)
+
+        fea = rnn_output.view(-1, c, h, w)
+        output = self.post_gnn(fea, adj)
+        output = output.view(-1, c, h, w)
+        return output
 
 class GRU_EAGCN(nn.Module):
     def __init__(self, num_in, plane_mid, mids):
