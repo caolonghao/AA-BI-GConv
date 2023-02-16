@@ -377,12 +377,17 @@ class AGGRU_EAGCN(nn.Module):
         self.prop_nums = prop_nums
         self.aggregation_mode = aggregation_mode
 
+        # select post gnn
         if postgnn == "APPNP":
             self.post_gnn = APPNP(num_s=num_in, depth=postgnn_depth, alpha=alpha)
         elif postgnn == "GAT":
             self.post_gnn = GAT(num_s=num_in, depth=postgnn_depth)
         elif postgnn == "GCN":
             self.post_gnn = Multi_layer_GCN(num_s=num_in, depth=postgnn)
+
+        # adj aggregation
+        if self.aggregation_mode == "GRU":
+            self.adj_gru = nn.GRU(input_size=1024, hidden_size=1024, num_layers=1, batch_first=True)
 
     def forward(self, seg, edge):
         sample_num, c, h, w = seg.size()
@@ -410,6 +415,11 @@ class AGGRU_EAGCN(nn.Module):
         elif self.aggregation_mode == "max":
             adj = torch.stack(adj_list, dim=1)
             adj, _ = torch.max(torch, dim=1)
+        elif self.aggregation_mode == "GRU":
+            rnn_output, rnn_h = self.adj_gru(adj_list[0])
+            for index in range(1, self.prop_nums):
+                rnn_output, rnn_h = self.adj_gru(adj_list[index], rnn_h)
+            adj = rnn_output.view(-1, h*w, h*w)
 
         fea = rnn_output.view(-1, c, h, w)
         output = self.post_gnn(fea, adj)
